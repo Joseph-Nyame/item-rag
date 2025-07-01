@@ -131,34 +131,58 @@ class ItemSync
     public function deleteSingle(int $itemId): bool
     {
         try {
-            // First find the UUID associated with this item
-            $item = Item::find($itemId);
-            if (!$item) {
-                Log::debug("Item {$itemId} not found, skipping delete");
-                return true;
-            }
+            //  filter to find points with this item ID in their payload
+            $filter = [
+                'must' => [
+                    [
+                        'key' => 'id',  // This refers to payload.id
+                        'match' => [
+                            'value' => $itemId
+                        ]
+                    ]
+                ]
+            ];
 
-            // Get the point ID from Qdrant (you might need to implement this)
-            $pointId = $this->getPointIdForItem($itemId);
-            
-            if (!$pointId) {
-                Log::debug("Point for item {$itemId} not found in Qdrant, skipping delete");
-                return true;
-            }
-
-            $response = Http::post(
-                "{$this->qdrantUrl}/collections/{$this->collectionName}/points/delete",
-                ['points' => [$pointId]]
+            // First search for the point(s) to delete
+            $searchResponse = Http::post(
+                "{$this->qdrantUrl}/collections/{$this->collectionName}/points/scroll",
+                [
+                    'filter' => $filter,
+                    'limit' => 1,       // only need one match
+                    'with_payload' => false,
+                    'with_vector' => false
+                ]
             );
 
-            if ($response->failed() && $response->status() !== 404) {
-                Log::error("Qdrant delete failed for item {$itemId}: Status {$response->status()}, Body: {$response->body()}");
-                throw new \Exception('Qdrant delete failed: ' . $response->body());
+            if ($searchResponse->failed()) {
+                throw new \Exception('Search failed: ' . $searchResponse->body());
             }
 
+            $result = $searchResponse->json();
+            $pointsToDelete = $result['result']['points'] ?? [];
+
+            if (empty($pointsToDelete)) {
+                Log::debug("No Qdrant point found for item ID {$itemId}");
+                return true;
+            }
+
+            // Extract the Qdrant point IDs
+            $pointIds = array_column($pointsToDelete, 'id');
+
+           
+            $deleteResponse = Http::post(
+                "{$this->qdrantUrl}/collections/{$this->collectionName}/points/delete",
+                ['points' => $pointIds]
+            );
+
+            if ($deleteResponse->failed()) {
+                throw new \Exception('Delete failed: ' . $deleteResponse->body());
+            }
+
+            Log::debug("Deleted point(s) " . implode(', ', $pointIds) . " for item {$itemId}");
             return true;
         } catch (\Exception $e) {
-            Log::error("ItemSync deleteSingle failed for item {$itemId}: {$e->getMessage()}");
+            Log::error("Delete failed for item {$itemId}: {$e->getMessage()}");
             throw $e;
         }
     }

@@ -9,13 +9,13 @@ use Illuminate\Support\Facades\Http;
 class ItemChatService
 {
     protected string $qdrantUrl;
-    protected $openAIClient;
+    protected $client; 
     protected string $collectionName = 'items';
 
     public function __construct()
     {
-        $this->qdrantUrl = env('VECTORDB_HOST');
-        $this->openAIClient = OpenAI::client(env('OPENAI_API_KEY'));
+        $this->qdrantUrl = 'http://' . env('VECTORDB_HOST', 'localhost') . ':' . env('QDRANT_PORT', '6333');
+        $this->client = OpenAI::client(env('OPENAI_API_KEY'));
     }
 
     /**
@@ -26,9 +26,7 @@ class ItemChatService
         // Step 1: Retrieve relevant items
         $context = $this->getRelevantContext($question);
         
-        
         $messages = $this->buildMessages($question, $context, $conversationHistory);
-        
         
         $response = $this->getAIResponse($messages);
         
@@ -99,7 +97,7 @@ PROMPT;
 
     protected function getAIResponse(array $messages): array
     {
-        $response = $this->openAIClient->chat()->create([
+        $response = $this->client->chat()->create([ // Changed to use $this->client
             'model' => 'gpt-4',
             'messages' => $messages,
             'temperature' => 0.7,
@@ -113,7 +111,7 @@ PROMPT;
 
     protected function getEmbedding(string $text): array
     {
-        $response = $this->openAIClient->embeddings()->create([
+        $response = $this->client->embeddings()->create([ // Changed to use $this->client
             'model' => 'text-embedding-3-small',
             'input' => $text
         ]);

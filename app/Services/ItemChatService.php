@@ -10,10 +10,11 @@ class ItemChatService
 {
     protected string $qdrantUrl;
     protected $client; 
-    protected string $collectionName = 'productsCollection';
+    protected  $collectionName;
 
     public function __construct()
     {
+        $this->collectionName = env('COLLECTION_NAME'); 
         $this->qdrantUrl = 'http://' . env('VECTORDB_HOST', 'localhost') . ':' . env('QDRANT_PORT', '6333');
         $this->client = OpenAI::client(env('OPENAI_API_KEY'));
     }

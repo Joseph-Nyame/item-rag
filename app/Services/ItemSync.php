@@ -12,11 +12,12 @@ class ItemSync
 {
     private $client;
     protected $qdrantUrl;
-    protected string $collectionName = 'productsCollection';
+    protected  $collectionName;
     protected int $vectorSize = 1536;
 
     public function __construct(protected OpenAI $openai)
     {
+        $this->collectionName = env('COLLECTION_NAME'); 
         $this->qdrantUrl = 'http://' . env('VECTORDB_HOST', 'localhost') . ':' . env('QDRANT_PORT', '6333');
         $this->client = OpenAI::client(env('OPENAI_API_KEY'));
         

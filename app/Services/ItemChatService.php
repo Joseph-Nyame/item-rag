@@ -10,7 +10,7 @@ class ItemChatService
 {
     protected string $qdrantUrl;
     protected $client; 
-    protected string $collectionName = 'items';
+    protected string $collectionName = 'productsCollection';
 
     public function __construct()
     {

@@ -12,7 +12,7 @@ class ItemSync
 {
     private $client;
     protected $qdrantUrl;
-    protected string $collectionName = 'items';
+    protected string $collectionName = 'productsCollection';
     protected int $vectorSize = 1536;
 
     public function __construct(protected OpenAI $openai)
@@ -135,7 +135,7 @@ class ItemSync
             $filter = [
                 'must' => [
                     [
-                        'key' => 'id',  // This refers to payload.id
+                        'key' => 'original_id',  // This refers to payload.originalid
                         'match' => [
                             'value' => $itemId
                         ]
@@ -187,32 +187,75 @@ class ItemSync
         }
     }
 
-
-    protected function getPointIdForItem(int $itemId): ?string
+    /**
+     * Update a single item in Qdrant
+     */
+    public function updateSingle(Item $item): bool
     {
-        // Query Qdrant to find the point ID for this item
-        $response = Http::post(
-            "{$this->qdrantUrl}/collections/{$this->collectionName}/points/scroll",
-            [
-                'filter' => [
-                    'must' => [
-                        [
-                            'key' => 'original_id',
-                            'match' => ['value' => $itemId]
-                        ]
-                    ]
+        try {
+            $this->ensureCollectionExists();
+
+            // Find the existing point by original_id
+            $filter = [
+                'must' => [
+                    [
+                        'key' => 'original_id',
+                        'match' => [
+                            'value' => $item->id,
+                        ],
+                    ],
                 ],
-                'limit' => 1
-            ]
-        );
+            ];
 
-        if ($response->successful()) {
-            $data = $response->json();
-            return $data['result']['points'][0]['id'] ?? null;
+            $searchResponse = Http::post(
+                "{$this->qdrantUrl}/collections/{$this->collectionName}/points/scroll",
+                [
+                    'filter' => $filter,
+                    'limit' => 1,
+                    'with_payload' => true,
+                    'with_vector' => false,
+                ]
+            );
+
+            if ($searchResponse->failed()) {
+                Log::error("Qdrant search failed for item {$item->id}: Status {$searchResponse->status()}, Body: {$searchResponse->body()}");
+                throw new \Exception('Qdrant search failed: ' . $searchResponse->body());
+            }
+
+            $result = $searchResponse->json();
+            $points = $result['result']['points'] ?? [];
+
+            if (empty($points)) {
+                Log::info("No existing Qdrant point found for item {$item->id}, performing sync instead");
+                return $this->syncSingle($item); // If no point exists, create a new one
+            }
+
+            $existingPointId = $points[0]['id'];
+
+            // Prepare updated point with the same UUID
+            $point = $this->preparePoint($item);
+            $point['id'] = $existingPointId; // Reuse the existing point ID
+
+            $payload = ['points' => [$point]];
+            Log::debug("Qdrant updateSingle payload: " . json_encode($payload, JSON_PRETTY_PRINT));
+
+            $response = Http::withHeaders(['Content-Type' => 'application/json'])
+                ->put("{$this->qdrantUrl}/collections/{$this->collectionName}/points", $payload);
+
+            if ($response->failed()) {
+                Log::error("Qdrant updateSingle failed for item {$item->id}: Status {$response->status()}, Body: {$response->body()}");
+                throw new \Exception('Qdrant update failed: ' . $response->body());
+            }
+
+            Log::info("Updated Qdrant point {$existingPointId} for item {$item->id}");
+            return true;
+        } catch (\Exception $e) {
+            Log::error("ItemSync updateSingle failed for item {$item->id}: {$e->getMessage()}");
+            throw $e;
         }
-
-        return null;
     }
+
+
     /**
      * Ensure the Qdrant collection exists
      */
@@ -248,26 +291,26 @@ class ItemSync
      * Prepare a single point for an item
      */
     protected function preparePoint(Item $item): array
-{
-    $text = implode(' ', array_filter([
-        $item->name,
-        $item->description,
-    ])) ?: json_encode($item->toArray());
+    {
+        $text = implode(' ', array_filter([
+            $item->name,
+            $item->description,
+        ])) ?: json_encode($item->toArray());
 
-    $vector = $this->embedText($text);
+        $vector = $this->embedText($text);
 
-    return [
-        'id' => (string) Str::uuid(), // Generate new UUID for each point
-        'vector' => $vector,
-        'payload' => [
-            'original_id' => $item->id, 
-            'name' => $item->name ?? '',
-            'description' => $item->description ?? '',
-            'created_at' => $item->created_at?->toDateTimeString() ?? now()->toDateTimeString(),
-            'updated_at' => $item->updated_at?->toDateTimeString() ?? now()->toDateTimeString(),
-        ],
-    ];
-}
+        return [
+            'id' => (string) Str::uuid(), // Generate new UUID for each point
+            'vector' => $vector,
+            'payload' => [
+                'original_id' => $item->id, 
+                'name' => $item->name ?? '',
+                'description' => $item->description ?? '',
+                'created_at' => $item->created_at?->toDateTimeString() ?? now()->toDateTimeString(),
+                'updated_at' => $item->updated_at?->toDateTimeString() ?? now()->toDateTimeString(),
+            ],
+        ];
+    }
 
     /**
      * Embed a single text using OpenAI

@@ -19,7 +19,7 @@ class ItemObserver
 
     public function updated(Item $item)
     {
-        $this->itemSync->syncSingle($item);
+        $this->itemSync->updateSingle($item);
     }
 
     public function deleted(Item $item)

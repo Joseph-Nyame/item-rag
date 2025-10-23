@@ -22,7 +22,6 @@ class ItemCrudTest extends TestCase
 
     private function cleanupItems()
     {
-        
         $contentPath = base_path('content/items');
         if (File::exists($contentPath)) {
             File::cleanDirectory($contentPath);

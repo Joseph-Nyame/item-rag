@@ -17,10 +17,11 @@ jobs:
           - 6333:6333
           - 6334:6334
         options: >-
-          --health-cmd "curl -f http://localhost:6333/readyz || exit 1"
+          --health-cmd "curl -f http://localhost:6333/healthz || exit 1"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+          --health-start-period 30s
 
     steps:
       - uses: shivammathur/setup-php@15c43e89cdef867065b0213be354c2841860869e
@@ -44,10 +45,18 @@ jobs:
       - name: Create content directory
         run: mkdir -p content/items
 
-      - name: Wait for Qdrant
+      - name: Wait for Qdrant to be ready
         run: |
-          timeout 30 bash -c 'until curl -f http://localhost:6333/readyz; do sleep 1; done'
-          echo "Qdrant is ready!"
+          for i in {1..30}; do
+            if curl -f http://localhost:6333/healthz > /dev/null 2>&1; then
+              echo "Qdrant is ready!"
+              exit 0
+            fi
+            echo "Waiting for Qdrant... ($i/30)"
+            sleep 2
+          done
+          echo "Qdrant failed to start"
+          exit 1
 
       - name: Run Tests
         run: php artisan test

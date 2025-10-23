@@ -7,11 +7,12 @@ use App\Observers\ItemObserver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 #[ObservedBy([ItemObserver::class])]
 class Item extends Model
 {
-    use Orbital;
+    use Orbital, HasFactory;
 
     protected $fillable = ['name', 'description'];
 
@@ -26,7 +27,7 @@ class Item extends Model
     {
         return 'id';
     }
-    
+
     public function getIncrementing()
     {
         return true;

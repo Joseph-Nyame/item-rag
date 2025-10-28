@@ -3,7 +3,7 @@ FROM serversideup/php:8.3-fpm-nginx-v3.3.0
 # Switch to root to install packages
 USER root
 
-# Install system dependencies (using apt-get for Debian)
+# Install system dependencies 
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions (most are likely already installed in this image)
+# Install PHP extensions
 RUN docker-php-ext-install \
     pdo_mysql \
     mbstring \

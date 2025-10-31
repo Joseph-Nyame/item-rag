@@ -17,6 +17,8 @@ Route::get('/branch-info', function () {
         'env' => config('app.env')
     ]);
 
+});
+
 Route::resource('items', ItemController::class);
 
 Route::get('/items/sync/qdrant', function (ItemSync $itemSync) {

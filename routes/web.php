@@ -10,6 +10,13 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/branch-info', function () {
+    return view('branch-info', [
+        'branch' => 'DEVELOP',
+        'color' => '#2196F3',
+        'env' => config('app.env')
+    ]);
+
 Route::resource('items', ItemController::class);
 
 Route::get('/items/sync/qdrant', function (ItemSync $itemSync) {

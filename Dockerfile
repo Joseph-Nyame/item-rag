@@ -3,7 +3,7 @@ FROM serversideup/php:8.3-fpm-nginx-v3.3.0
 # Switch to root to install packages
 USER root
 
-# Install system dependencies 
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -41,5 +41,5 @@ RUN chmod -R 755 /var/www/html/storage \
 # Switch back to www-data user
 USER www-data
 
-EXPOSE 8080
+
 

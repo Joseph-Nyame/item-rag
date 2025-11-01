@@ -21,6 +21,15 @@ Route::get('/branch-info', function () {
 
 Route::resource('items', ItemController::class);
 
+
+Route::get('/branch-info', function () {
+    return view('branch-info', [
+        'branch' => 'PRODUCTION',
+        'color' => '#4CAF50',
+        'env' => config('app.env')
+    ]);
+});
+
 Route::get('/items/sync/qdrant', function (ItemSync $itemSync) {
     $count = $itemSync->fullSync();
     return response()->json([
